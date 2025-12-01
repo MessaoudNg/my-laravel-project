@@ -1,7 +1,8 @@
 # -----------------------------
 # 1) PHP 8.1 + Extensions
 # -----------------------------
-FROM php:8.1-fpm
+FROM php:8.0-fpm
+
 
 # تثبيت الحزم الأساسية
 RUN apt-get update && apt-get install -y \

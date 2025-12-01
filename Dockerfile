@@ -1,40 +1,50 @@
-# الصورة الأساسية PHP بصيغة FPM
+# -----------------------------
+# 1) PHP 8.1 + Extensions
+# -----------------------------
 FROM php:8.1-fpm
 
-# تثبيت الأدوات اللازمة
+# تثبيت الحزم الأساسية
 RUN apt-get update && apt-get install -y \
     git \
-    unzip \
     curl \
+    zip \
+    unzip \
+    nginx \
     libzip-dev \
     libpng-dev \
     libonig-dev \
-    libxml2-dev
+    libxml2-dev \
+    && docker-php-ext-install pdo_mysql mbstring zip xml gd
 
-# تثبيت إضافات PHP المطلوبة للـ Laravel
-RUN docker-php-ext-install pdo_mysql mbstring zip exif pcntl
-
-# تثبيت Composer داخل الحاوية
+# تثبيت Composer
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
-# مجلد العمل داخل الحاوية
+# -----------------------------
+# 2) Laravel Setup
+# -----------------------------
 WORKDIR /var/www/html
 
-# نسخ المشروع كاملًا
 COPY . .
 
-# تثبيت اعتمادات Laravel بدون أي سكريبتات
-RUN composer install --no-dev --no-scripts --prefer-dist --no-progress --no-interaction
+RUN composer install --no-dev --optimize-autoloader --no-interaction --no-progress
 
-# توليد APP_KEY بعد تثبيت الـ vendor
+# إنشاء env لو غير موجود
+RUN cp .env.example .env || true
+
 RUN php artisan key:generate || true
 
-# أعطاء صلاحيات للمجلدات الضرورية
-RUN chmod -R 775 storage bootstrap/cache \
-    && chown -R www-data:www-data storage bootstrap/cache
+RUN chown -R www-data:www-data storage bootstrap/cache
+RUN chmod -R 775 storage bootstrap/cache
 
-# المنفذ
-EXPOSE 9000
+# -----------------------------
+# 3) إعداد NGINX
+# -----------------------------
+COPY ./nginx.conf /etc/nginx/sites-enabled/default
 
-# تشغيل PHP-FPM بشكل افتراضي
-CMD ["php-fpm"]
+# فتح المنفذ
+EXPOSE 80
+
+# -----------------------------
+# 4) Start Script
+# -----------------------------
+CMD service nginx start && php-fpm

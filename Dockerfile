@@ -1,37 +1,40 @@
-# استخدم صورة PHP مناسبة
+# الصورة الأساسية PHP بصيغة FPM
 FROM php:8.1-fpm
 
-# تثبيت الأدوات المطلوبة
+# تثبيت الأدوات اللازمة
 RUN apt-get update && apt-get install -y \
-    libzip-dev \
-    unzip \
     git \
-    curl
+    unzip \
+    curl \
+    libzip-dev \
+    libpng-dev \
+    libonig-dev \
+    libxml2-dev
 
-# تمكين امتدادات PHP المطلوبة
-RUN docker-php-ext-install pdo_mysql zip
+# تثبيت إضافات PHP المطلوبة للـ Laravel
+RUN docker-php-ext-install pdo_mysql mbstring zip exif pcntl
 
-# نسخ Composer من الصورة الرسمية
+# تثبيت Composer داخل الحاوية
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
-# ضبط مجلد العمل
+# مجلد العمل داخل الحاوية
 WORKDIR /var/www/html
 
-# نسخ ملفات المشروع
+# نسخ المشروع كاملًا
 COPY . .
 
-# تثبيت اعتمادات المشروع
-RUN composer install --optimize-autoloader --no-dev
+# تثبيت اعتمادات Laravel بدون أي سكريبتات
+RUN composer install --no-dev --no-scripts --prefer-dist --no-progress --no-interaction
 
-# توليد مفتاح التطبيق بعد تثبيت الاعتمادات
-RUN php artisan key:generate
+# توليد APP_KEY بعد تثبيت الـ vendor
+RUN php artisan key:generate || true
 
-# ضبط صلاحيات المجلدات
-RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
-RUN chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
+# أعطاء صلاحيات للمجلدات الضرورية
+RUN chmod -R 775 storage bootstrap/cache \
+    && chown -R www-data:www-data storage bootstrap/cache
 
-# ضبط مجلد العمل العام
-WORKDIR /var/www/html/public
+# المنفذ
+EXPOSE 9000
 
-# تشغيل PHP-FPM
+# تشغيل PHP-FPM بشكل افتراضي
 CMD ["php-fpm"]

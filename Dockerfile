@@ -1,51 +1,43 @@
-# -----------------------------
-# 1) PHP 8.1 + Extensions
-# -----------------------------
-FROM php:8.0-fpm
+# ----------------------------------------------------
+# PHP-FPM + Extensions
+# ----------------------------------------------------
+FROM php:8.1-fpm
 
-
-# تثبيت الحزم الأساسية
+# Install system dependencies
 RUN apt-get update && apt-get install -y \
-    git \
-    curl \
+    build-essential \
+    libpng-dev \
+    libjpeg62-turbo-dev \
+    libfreetype6-dev \
+    libonig-dev \
+    libzip-dev \
     zip \
     unzip \
-    nginx \
-    libzip-dev \
-    libpng-dev \
-    libonig-dev \
-    libxml2-dev \
-    && docker-php-ext-install pdo_mysql mbstring zip xml gd
+    curl \
+    nginx
 
-# تثبيت Composer
-COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
+# Install PHP extensions
+RUN docker-php-ext-install pdo pdo_mysql mbstring zip exif pcntl
+RUN docker-php-ext-configure gd --with-freetype --with-jpeg
+RUN docker-php-ext-install gd
 
-# -----------------------------
-# 2) Laravel Setup
-# -----------------------------
+# Copy project
+COPY . /var/www/html
+
+# Set working directory
 WORKDIR /var/www/html
 
-COPY . .
-
+# Composer install
+RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
 RUN composer install --no-dev --optimize-autoloader --no-interaction --no-progress
 
-# إنشاء env لو غير موجود
-RUN cp .env.example .env || true
+# Copy nginx config
+COPY nginx.conf /etc/nginx/sites-enabled/default
 
-RUN php artisan key:generate || true
+# Laravel permissions
+RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
 
-RUN chown -R www-data:www-data storage bootstrap/cache
-RUN chmod -R 775 storage bootstrap/cache
-
-# -----------------------------
-# 3) إعداد NGINX
-# -----------------------------
-COPY ./nginx.conf /etc/nginx/sites-enabled/default
-
-# فتح المنفذ
+# Expose port
 EXPOSE 80
 
-# -----------------------------
-# 4) Start Script
-# -----------------------------
 CMD service nginx start && php-fpm

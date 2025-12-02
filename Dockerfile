@@ -1,8 +1,11 @@
-FROM php:8.1-fpm
+# ----------------------------------------------------
+# PHP-FPM 8.3 + Extensions (Solution for Render)
+# ----------------------------------------------------
+FROM php:8.3-fpm
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
-    nginx \
+    build-essential \
     libpng-dev \
     libjpeg62-turbo-dev \
     libfreetype6-dev \
@@ -10,30 +13,30 @@ RUN apt-get update && apt-get install -y \
     libzip-dev \
     zip \
     unzip \
-    curl
+    curl \
+    nginx
 
-# PHP extensions
+# Install PHP extensions
 RUN docker-php-ext-install pdo pdo_mysql mbstring zip exif pcntl
 RUN docker-php-ext-configure gd --with-freetype --with-jpeg
 RUN docker-php-ext-install gd
 
+# Copy project
+COPY . /var/www/html
+
+WORKDIR /var/www/html
+
 # Install Composer
 RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
 
-# Copy app files
-COPY . /var/www/html
-WORKDIR /var/www/html
-
 # Composer install
-RUN composer install --no-dev --optimize-autoloader --no-interaction
+RUN composer install --no-dev --optimize-autoloader --no-interaction --no-progress
 
-# Nginx config
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+# Copy nginx config
+COPY nginx.conf /etc/nginx/sites-enabled/default
 
 # Permissions
-RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
+RUN chown -R www-data:www-data storage bootstrap/cache
 
 EXPOSE 80
-
-# Start both Nginx and PHP-FPM
-CMD php-fpm & nginx -g 'daemon off;'
+CMD service nginx start && php-fpm
